@@ -4,7 +4,7 @@ Flags = -std=c++11 -Wextra -g -Wall
 
 
 server : Makefile server.o utils.o httpserver.o
-	g++ $(Flags) -o transport server.o utils.o httpserver.o
+	g++ $(Flags) -o server server.o utils.o httpserver.o
 
 server.o : Makefile main.cpp utils.o
 	g++ -c $(Flags) main.cpp -o  server.o
@@ -19,4 +19,4 @@ clean:
 		rm -rf *.o
 
 distclean:
-		rm -rf *.o transport .*.swp *.h.gch
+		rm -rf *.o server .*.swp *.h.gch

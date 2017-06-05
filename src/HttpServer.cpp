@@ -77,10 +77,13 @@ int HttpServer::readSocket(char *buffer, int length) {
     int i = 0;
     while (i < length - 1 && c != '\n') {
         ssize_t received = recv(this->server, &c, 1, 0);
-        std::cerr << strerror(errno) << std::endl;
+        if (!received) {
+            std::cerr << strerror(errno) << std::endl;
+            break;
+        }
+        buffer[i] = c;
         i++;
     }
-//    if (received)
-//        std::cout << "received: " << received << std::endl;
+
     return 0;
 }
