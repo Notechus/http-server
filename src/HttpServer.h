@@ -21,19 +21,31 @@ public:
     int run();
 
 private:
-    void handleRequest();
+    bool handleRequest();
 
-    int readSocket(char *buffer, int length);
+    HttpRequest readSocket();
 
-    void handle200();
+    HttpRequest processRequest(std::string request);
 
-    void handle301();
+    void handle200(HttpRequest &request);
+
+    void handle301(HttpRequest &request);
 
     void handle403();
 
     void handle404();
 
     void handle501();
+
+    void keepAlive();
+
+    void extractMethod(std::string line, HttpRequest &request);
+
+    void extractHost(std::string line, HttpRequest &request);
+
+    void extractConnection(std::string line, HttpRequest &request);
+
+    void setHeader(HttpRequest request, std::string &header);
 };
 
 
