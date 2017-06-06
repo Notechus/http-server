@@ -6,6 +6,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <algorithm>
 #include <string.h>
 #include <stdlib.h>
 #include <dirent.h>
