@@ -8,11 +8,10 @@ private:
     int server = -1;
     int client = -1;
     int port;
-    std::string address;
     std::string path;
 
 public:
-    HttpServer(int port_, std::string address_, std::string path_);
+    HttpServer(int port_, std::string path_);
 
     int start();
 
@@ -45,7 +44,11 @@ private:
 
     void extractConnection(std::string line, HttpRequest &request);
 
-    void setHeader(HttpRequest request, std::string &header);
+    void setHeader(HttpRequest &request, std::string &header);
+
+    void sendTextFile(std::string filePath);
+
+    void sendBinaryFile(std::string filePath);
 };
 
 

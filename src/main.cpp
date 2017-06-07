@@ -32,13 +32,10 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    std::string address = "127.0.0.1";
-
-    HttpServer server(serverPort, address, path);
+    HttpServer server(serverPort, path);
 
     if (server.start()) {
         int run = server.run();
-
         if (run < 0) {
             std::cerr << "There was an error during server work\n";
             std::cerr << "The application will close.\n";
@@ -46,7 +43,6 @@ int main(int argc, char **argv) {
 
             return EXIT_FAILURE;
         }
-        server.finalize();
     }
     server.finalize();
     return 0;

@@ -32,6 +32,7 @@ struct HttpRequest {
     MethodType method;
     std::string path;
     std::string file;
+    std::string content;
     bool keepAlive;
     int port;
 };
