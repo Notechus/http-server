@@ -19,7 +19,7 @@ public:
 
     int run();
 
-private:
+public:
     bool handleRequest();
 
     HttpRequest readSocket();
