@@ -28,7 +28,7 @@ public:
 
     void handle200(HttpRequest &request);
 
-    void handle301(HttpRequest &request);
+    void handle301(const HttpRequest &request);
 
     void handle403();
 
@@ -38,17 +38,17 @@ public:
 
     void keepAlive();
 
-    void extractMethod(std::string line, HttpRequest &request);
+    static void extractMethod(std::string line, HttpRequest &request);
 
-    void extractHost(std::string line, HttpRequest &request);
+    static void extractHost(std::string line, HttpRequest &request);
 
-    void extractConnection(std::string line, HttpRequest &request);
+    static void extractConnection(std::string line, HttpRequest &request);
 
-    void setHeader(HttpRequest &request, std::string &header);
+    static void setHeader(HttpRequest &request, std::string &header);
 
-    void sendTextFile(std::string filePath);
+    void sendTextFile(const std::string& filePath) const;
 
-    void sendBinaryFile(std::string filePath);
+    void sendBinaryFile(const std::string &filePath) const;
 };
 
 

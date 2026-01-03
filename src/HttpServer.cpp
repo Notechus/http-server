@@ -1,10 +1,11 @@
 #include "HttpServer.h"
 
+#include <utility>
+
 void custom_trim(std::string &text);
 
-HttpServer::HttpServer(int port_, std::string path_)
-        : port(port_), path(path_) {
-
+HttpServer::HttpServer(const int port_, std::string path_)
+    : port(port_), path(std::move(path_)) {
 }
 
 int HttpServer::start() {
@@ -14,14 +15,14 @@ int HttpServer::start() {
         return -1;
     }
 
-    struct sockaddr_in server;
+    struct sockaddr_in serv;
 
-    bzero(&server, sizeof(server));
-    server.sin_family = AF_INET;
-    server.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.sin_port = htons(this->port);
+    bzero(&serv, sizeof(serv));
+    serv.sin_family = AF_INET;
+    serv.sin_addr.s_addr = htonl(INADDR_ANY);
+    serv.sin_port = htons(this->port);
 
-    if (bind(sock, (const sockaddr *) &server, sizeof(server)) < 0) {
+    if (bind(sock, (const sockaddr *) &serv, sizeof(serv)) < 0) {
         std::cerr << "There was an error while binding the socket\n";
         std::cerr << strerror(errno) << std::endl;
         return -1;
@@ -43,10 +44,10 @@ int HttpServer::finalize() {
 }
 
 int HttpServer::run() {
-    struct sockaddr_in client_name;
+    struct sockaddr_in client_name{};
     socklen_t client_name_len = sizeof(client_name);
 
-    while (1) {
+    while (true) {
         client = accept(server, (struct sockaddr *) &client_name, &client_name_len);
         if (client == -1) {
             std::cerr << "There was error while accepting the connection\n";
@@ -101,6 +102,12 @@ HttpRequest HttpServer::processRequest(std::string request) {
     getline(stream, host);
     getline(stream, connection);
 
+    std::cout << "Processing the request "
+            << method << ", "
+            << host << ", "
+            << connection << ", "
+            << std::endl;
+
     extractMethod(method, req);
     extractHost(host, req);
     extractConnection(connection, req);
@@ -110,8 +117,8 @@ HttpRequest HttpServer::processRequest(std::string request) {
 
 void HttpServer::extractMethod(std::string line, HttpRequest &request) {
     custom_trim(line);
-    unsigned long space = line.find_first_of(" ");
-    unsigned long http = line.find_last_of(" ");
+    unsigned long space = line.find_first_of(' ');
+    unsigned long http = line.find_last_of(' ');
 
     if (space > 0 && http > 0) {
         std::string method = line.substr(0, space);
@@ -142,10 +149,8 @@ void HttpServer::extractHost(std::string line, HttpRequest &request) {
             std::string port = line.substr(dot + 1, line.length() - dot);
             request.port = std::stoi(port);
         } catch (...) {
-
         }
     }
-
 }
 
 void HttpServer::extractConnection(std::string line, HttpRequest &request) {
@@ -186,7 +191,7 @@ void HttpServer::handle200(HttpRequest &request) {
     }
 }
 
-void HttpServer::handle301(HttpRequest &request) {
+void HttpServer::handle301(const HttpRequest &request) {
     char buff[RESPONSE_BUFFER];
 
     sprintf(buff, "HTTP/1.1 301 Moved Permanently\r\n");
@@ -243,7 +248,7 @@ void HttpServer::handle501() {
 }
 
 void HttpServer::setHeader(HttpRequest &request, std::string &header) {
-    unsigned long dot = request.file.find_last_of(".");
+    unsigned long dot = request.file.find_last_of('.');
     std::string extension = request.file.substr(dot + 1, request.file.length() - dot);
 
     if (extension == "html") {
@@ -272,19 +277,19 @@ void HttpServer::setHeader(HttpRequest &request, std::string &header) {
 
 void HttpServer::keepAlive() {
     fd_set descriptors;
-    FD_ZERO (&descriptors);
-    FD_SET (server, &descriptors);
+    FD_ZERO(&descriptors);
+    FD_SET(server, &descriptors);
     struct timeval tv;
     tv.tv_sec = TIMEOUT_SECONDS;
     tv.tv_usec = 0;
 
-    int ready = select(server + 1, &descriptors, NULL, NULL, &tv);
+    int ready = select(server + 1, &descriptors, nullptr, nullptr, &tv);
     if (ready > 0) {
         readSocket();
     }
 }
 
-void HttpServer::sendTextFile(std::string filePath) {
+void HttpServer::sendTextFile(const std::string &filePath) const {
     std::string line;
     std::ifstream file;
     file.open(filePath);
@@ -296,7 +301,7 @@ void HttpServer::sendTextFile(std::string filePath) {
     }
 }
 
-void HttpServer::sendBinaryFile(std::string filePath) {
+void HttpServer::sendBinaryFile(const std::string &filePath) const {
     std::ifstream file;
     char buff[RESPONSE_BUFFER];
     file.open(filePath, std::ios::binary | std::ios::in);
@@ -320,5 +325,6 @@ void HttpServer::sendBinaryFile(std::string filePath) {
 
 void custom_trim(std::string &text) {
     text.erase(std::find_if(text.rbegin(), text.rend(),
-                            std::not1(std::ptr_fun<int, int>(std::isspace))).base(), text.end());
+                            [](const char ch) { return !std::isspace(static_cast<unsigned char>(ch)); }).base(),
+               text.end());
 }
