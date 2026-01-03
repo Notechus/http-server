@@ -9,7 +9,7 @@ HttpServer::HttpServer(const int port_, std::string path_)
 }
 
 int HttpServer::start() {
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    const int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == -1) {
         std::cerr << "There was an error while initializing the socket\n";
         return -1;
@@ -22,7 +22,7 @@ int HttpServer::start() {
     serv.sin_addr.s_addr = htonl(INADDR_ANY);
     serv.sin_port = htons(this->port);
 
-    if (bind(sock, (const sockaddr *) &serv, sizeof(serv)) < 0) {
+    if (bind(sock, reinterpret_cast<const sockaddr *>(&serv), sizeof(serv)) < 0) {
         std::cerr << "There was an error while binding the socket\n";
         std::cerr << strerror(errno) << std::endl;
         return -1;
@@ -48,7 +48,7 @@ int HttpServer::run() {
     socklen_t client_name_len = sizeof(client_name);
 
     while (true) {
-        client = accept(server, (sockaddr *) &client_name, &client_name_len);
+        client = accept(server, reinterpret_cast<sockaddr *>(&client_name), &client_name_len);
         if (client == -1) {
             std::cerr << "There was error while accepting the connection\n";
             std::cout << strerror(errno) << std::endl;
@@ -83,7 +83,7 @@ bool HttpServer::handleRequest() const {
 HttpRequest HttpServer::readSocket() const {
     char buffer[BUFFER_SIZE];
 
-    ssize_t received = recv(client, buffer, (size_t) BUFFER_SIZE, 0);
+    const ssize_t received = recv(client, buffer, BUFFER_SIZE, 0);
 
     if (received < 0) {
         std::cerr << "There was an error while receiving data\n";
@@ -101,12 +101,6 @@ HttpRequest HttpServer::processRequest(const std::string &request) {
     getline(stream, method);
     getline(stream, host);
     getline(stream, connection);
-
-    std::cout << "Processing the request "
-            << method << ", "
-            << host << ", "
-            << connection << ", "
-            << std::endl;
 
     extractMethod(method, req);
     extractHost(host, req);
