@@ -35,15 +35,19 @@ int main(int argc, char **argv) {
     HttpServer server(serverPort, path);
 
     if (server.start()) {
-        int run = server.run();
+        const int run = server.run();
         if (run < 0) {
             std::cerr << "There was an error during server work\n";
             std::cerr << "The application will close.\n";
-            server.finalize();
+            const int code = server.finalize();
+
+            std::cout << "Exited with code " << code << std::endl;
 
             return EXIT_FAILURE;
         }
     }
-    server.finalize();
+    const int code = server.finalize();
+
+    std::cout << "Exited with code " << code << std::endl;
     return 0;
 }

@@ -15,28 +15,27 @@ public:
 
     int start();
 
-    int finalize();
+    int finalize() const;
 
     int run();
 
-public:
-    bool handleRequest();
+    bool handleRequest() const;
 
-    HttpRequest readSocket();
+    HttpRequest readSocket() const;
 
-    HttpRequest processRequest(std::string request);
+    static HttpRequest processRequest(std::string request);
 
-    void handle200(HttpRequest &request);
+    void handle200(HttpRequest &request) const;
 
-    void handle301(const HttpRequest &request);
+    void handle301(const HttpRequest &request) const;
 
-    void handle403();
+    void handle403() const;
 
-    void handle404();
+    void handle404() const;
 
-    void handle501();
+    void handle501() const;
 
-    void keepAlive();
+    void keepAlive() const;
 
     static void extractMethod(std::string line, HttpRequest &request);
 
@@ -46,7 +45,7 @@ public:
 
     static void setHeader(HttpRequest &request, std::string &header);
 
-    void sendTextFile(const std::string& filePath) const;
+    void sendTextFile(const std::string &filePath) const;
 
     void sendBinaryFile(const std::string &filePath) const;
 };

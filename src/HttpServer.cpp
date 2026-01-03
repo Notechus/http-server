@@ -15,7 +15,7 @@ int HttpServer::start() {
         return -1;
     }
 
-    struct sockaddr_in serv;
+    sockaddr_in serv{};
 
     bzero(&serv, sizeof(serv));
     serv.sin_family = AF_INET;
@@ -39,7 +39,7 @@ int HttpServer::start() {
     return sock;
 }
 
-int HttpServer::finalize() {
+int HttpServer::finalize() const {
     return close(server) || close(client);
 }
 
@@ -60,14 +60,14 @@ int HttpServer::run() {
     }
 }
 
-bool HttpServer::handleRequest() {
+bool HttpServer::handleRequest() const {
     HttpRequest request = readSocket();
     HttpResponse response;
     std::cout << "Got request for: " << request.path << " " << request.file << std::endl;
     if (request.method != MethodType::GET) {
         handle501();
         std::cout << "501 Method Not Implemented\n";
-    } else if (request.file == "" || request.file == "/") {
+    } else if (request.file.empty() || request.file == "/") {
         handle301(request);
         std::cout << "301 Moved Permanently\n";
     } else if (request.file.find_last_of(".") > request.file.length()) {
@@ -80,7 +80,7 @@ bool HttpServer::handleRequest() {
     return request.keepAlive;
 }
 
-HttpRequest HttpServer::readSocket() {
+HttpRequest HttpServer::readSocket() const {
     char buffer[BUFFER_SIZE];
 
     ssize_t received = recv(client, buffer, (size_t) BUFFER_SIZE, 0);
@@ -163,7 +163,7 @@ void HttpServer::extractConnection(std::string line, HttpRequest &request) {
     }
 }
 
-void HttpServer::handle200(HttpRequest &request) {
+void HttpServer::handle200(HttpRequest &request) const {
     request.path = "dom1.abc.pl";
     std::string filePath = this->path + "/" + request.path + "/" + request.file;
     char buff[RESPONSE_BUFFER];
@@ -176,9 +176,9 @@ void HttpServer::handle200(HttpRequest &request) {
     } else {
         file.close();
         setHeader(request, header);
-        sprintf(buff, "HTTP/1.1 200 OK\r\n");
+        snprintf(buff, 18, "HTTP/1.1 200 OK\r\n");
         send(client, buff, strlen(buff), 0);
-        sprintf(buff, "%s", header.c_str());
+        snprintf(buff, header.length() + 1, "%s", header.c_str());
         send(client, buff, strlen(buff), 0);
         strcpy(buff, "\r\n");
         send(client, buff, strlen(buff), 0);
@@ -191,59 +191,59 @@ void HttpServer::handle200(HttpRequest &request) {
     }
 }
 
-void HttpServer::handle301(const HttpRequest &request) {
+void HttpServer::handle301(const HttpRequest &request) const {
     char buff[RESPONSE_BUFFER];
 
-    sprintf(buff, "HTTP/1.1 301 Moved Permanently\r\n");
+    snprintf(buff, 33, "HTTP/1.1 301 Moved Permanently\r\n");
     send(client, buff, strlen(buff), 0);
-    sprintf(buff, "Location: http://%s:%d/index.html\r\n", request.path.c_str(), request.port);
+    snprintf(buff, 33, "Location: http://%s:%d/index.html\r\n", request.path.c_str(), request.port);
     send(client, buff, strlen(buff), 0);
-    sprintf(buff, "\r\n");
+    snprintf(buff, 3, "\r\n");
     send(client, buff, strlen(buff), 0);
 }
 
-void HttpServer::handle403() {
+void HttpServer::handle403() const {
     char buff[RESPONSE_BUFFER];
 
-    sprintf(buff, "HTTP/1.1 403 Forbidden\r\n");
+    snprintf(buff, 25, "HTTP/1.1 403 Forbidden\r\n");
     send(client, buff, strlen(buff), 0);
-    sprintf(buff, "Content-Type: text/html\r\n");
+    snprintf(buff, 26, "Content-Type: text/html\r\n");
     send(client, buff, strlen(buff), 0);
-    sprintf(buff, "\r\n");
+    snprintf(buff, 3, "\r\n");
     send(client, buff, strlen(buff), 0);
-    sprintf(buff, "<html><head><title>Forbidden</title></head>\r\n");
+    snprintf(buff, 46, "<html><head><title>Forbidden</title></head>\r\n");
     send(client, buff, strlen(buff), 0);
-    sprintf(buff, "<body><h3>Forbidden</h3></body></html>\r\n");
+    snprintf(buff, 41, "<body><h3>Forbidden</h3></body></html>\r\n");
     send(client, buff, strlen(buff), 0);
 }
 
-void HttpServer::handle404() {
+void HttpServer::handle404() const {
     char buff[RESPONSE_BUFFER];
 
-    sprintf(buff, "HTTP/1.1 404 Not Found\r\n");
+    snprintf(buff, 25, "HTTP/1.1 404 Not Found\r\n");
     send(client, buff, strlen(buff), 0);
-    sprintf(buff, "Content-Type: text/html\r\n");
+    snprintf(buff, 26, "Content-Type: text/html\r\n");
     send(client, buff, strlen(buff), 0);
-    sprintf(buff, "\r\n");
+    snprintf(buff, 3, "\r\n");
     send(client, buff, strlen(buff), 0);
-    sprintf(buff, "<html><head><title>Not Found</title></head>\r\n");
+    snprintf(buff, 46, "<html><head><title>Not Found</title></head>\r\n");
     send(client, buff, strlen(buff), 0);
-    sprintf(buff, "<body><h3>404 Not found</h3></body></html>\r\n");
+    snprintf(buff, 45, "<body><h3>404 Not found</h3></body></html>\r\n");
     send(client, buff, strlen(buff), 0);
 }
 
-void HttpServer::handle501() {
+void HttpServer::handle501() const {
     char buff[RESPONSE_BUFFER];
 
-    sprintf(buff, "HTTP/1.1 501 Method Not Implemented\r\n");
+    snprintf(buff, 38, "HTTP/1.1 501 Method Not Implemented\r\n");
     send(client, buff, strlen(buff), 0);
-    sprintf(buff, "Content-Type: text/html\r\n");
+    snprintf(buff, 26, "Content-Type: text/html\r\n");
     send(client, buff, strlen(buff), 0);
-    sprintf(buff, "\r\n");
+    snprintf(buff, 3, "\r\n");
     send(client, buff, strlen(buff), 0);
-    sprintf(buff, "<html><head><title>Method Not Implemented</title></head>\r\n");
+    snprintf(buff, 59, "<html><head><title>Method Not Implemented</title></head>\r\n");
     send(client, buff, strlen(buff), 0);
-    sprintf(buff, "<body><p>Chosen HTTP method is not supported yet.</body></html>\r\n");
+    snprintf(buff, 66, "<body><p>Chosen HTTP method is not supported yet.</body></html>\r\n");
     send(client, buff, strlen(buff), 0);
 }
 
@@ -275,11 +275,11 @@ void HttpServer::setHeader(HttpRequest &request, std::string &header) {
     }
 }
 
-void HttpServer::keepAlive() {
+void HttpServer::keepAlive() const {
     fd_set descriptors;
     FD_ZERO(&descriptors);
     FD_SET(server, &descriptors);
-    struct timeval tv;
+    timeval tv{};
     tv.tv_sec = TIMEOUT_SECONDS;
     tv.tv_usec = 0;
 
