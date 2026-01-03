@@ -1,13 +1,12 @@
 #include "HttpServer.h"
 
 #include <thread>
-#include <sys/stat.h>
 #include <utility>
 
 void custom_trim(std::string &text);
 
-HttpServer::HttpServer(const int port_, std::string path_)
-    : port(port_), path(std::move(path_)) {
+HttpServer::HttpServer(const int port_, std::string path_, const size_t availableConcurrency)
+    : port(port_), path(std::move(path_)), workers(availableConcurrency) {
 }
 
 int HttpServer::start() {
@@ -65,7 +64,14 @@ int HttpServer::run() const {
 }
 
 bool HttpServer::handleRequest(const int client) const {
-    HttpRequest request = readSocket(client);
+    auto requestOptional = readSocket(client);
+
+    // if there is no data, return immediately and stop
+    if (!requestOptional.has_value()) {
+        return false;
+    }
+
+    HttpRequest &request = *requestOptional;
     HttpResponse response;
     std::cout << "Got request for: " << request.path << " " << request.file << std::endl;
     if (request.method != MethodType::GET) {
@@ -84,15 +90,13 @@ bool HttpServer::handleRequest(const int client) const {
     return request.keepAlive;
 }
 
-HttpRequest HttpServer::readSocket(const int client) const {
+std::optional<HttpRequest> HttpServer::readSocket(const int client) const {
     char buffer[BUFFER_SIZE];
 
     const ssize_t received = recv(client, buffer, BUFFER_SIZE, 0);
 
     if (received <= 0) {
-        HttpRequest req{};
-        req.keepAlive = false; // Stop the loop
-        return req;
+        return std::nullopt;
     }
 
     return processRequest(std::string(buffer));

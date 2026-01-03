@@ -32,7 +32,14 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    HttpServer server(serverPort, path);
+    size_t availableConcurrency = std::thread::hardware_concurrency();
+    std::cout << "Available hardware concurrency is " << availableConcurrency << std::endl;
+    if (availableConcurrency == 0) {
+        availableConcurrency = 4;
+    }
+    std::cout << "Running " << 2 * availableConcurrency << " threads" << std::endl;
+
+    HttpServer server(serverPort, path, availableConcurrency);
 
     if (server.start()) {
         const int run = server.run();

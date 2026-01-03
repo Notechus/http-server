@@ -1,15 +1,17 @@
 #ifndef HTTP_SERVER_HTTPSERVER_H
 #define HTTP_SERVER_HTTPSERVER_H
 
+#include "ThreadPool.h"
 #include "utils.h"
 
 class HttpServer {
     int server = -1;
     int port;
     std::string path;
+    ThreadPool workers;
 
 public:
-    HttpServer(int port_, std::string path_);
+    HttpServer(int port_, std::string path_, size_t availableConcurrency);
 
     int start();
 
@@ -20,7 +22,7 @@ public:
 private:
     bool handleRequest(int client) const;
 
-    HttpRequest readSocket(int client) const;
+    std::optional<HttpRequest> readSocket(int client) const;
 
     static HttpRequest processRequest(const std::string &request);
 
