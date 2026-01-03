@@ -4,9 +4,7 @@
 #include "utils.h"
 
 class HttpServer {
-private:
     int server = -1;
-    int client = -1;
     int port;
     std::string path;
 
@@ -17,25 +15,24 @@ public:
 
     int finalize() const;
 
-    int run();
+    int run() const;
 
-    bool handleRequest() const;
+private:
+    bool handleRequest(int client) const;
 
-    HttpRequest readSocket() const;
+    HttpRequest readSocket(int client) const;
 
     static HttpRequest processRequest(const std::string &request);
 
-    void handle200(HttpRequest &request) const;
+    void handle200(HttpRequest &request, int client) const;
 
-    void handle301(const HttpRequest &request) const;
+    void handle301(const HttpRequest &request, int client) const;
 
-    void handle403() const;
+    void handle403(int client) const;
 
-    void handle404() const;
+    void handle404(int client) const;
 
-    void handle501() const;
-
-    void keepAlive() const;
+    void handle501(int client) const;
 
     static void extractMethod(std::string line, HttpRequest &request);
 
@@ -43,11 +40,13 @@ public:
 
     static void extractConnection(std::string line, HttpRequest &request);
 
-    static void setHeader(HttpRequest &request, std::string &header);
+    static void setHeader(HttpRequest &request, std::string &header, const std::string &filePath);
 
-    void sendTextFile(const std::string &filePath) const;
+    void sendBinaryFile(const std::string &filePath, int client) const;
 
-    void sendBinaryFile(const std::string &filePath) const;
+    void handleClient(int client_fd) const;
+
+    static std::string getContentType(const std::string &filename);
 };
 
 

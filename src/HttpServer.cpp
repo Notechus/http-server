@@ -1,5 +1,7 @@
 #include "HttpServer.h"
 
+#include <thread>
+#include <sys/stat.h>
 #include <utility>
 
 void custom_trim(std::string &text);
@@ -40,54 +42,57 @@ int HttpServer::start() {
 }
 
 int HttpServer::finalize() const {
-    return close(server) || close(client);
+    return close(server);
 }
 
-int HttpServer::run() {
+int HttpServer::run() const {
     sockaddr_in client_name{};
     socklen_t client_name_len = sizeof(client_name);
 
     while (true) {
-        client = accept(server, reinterpret_cast<sockaddr *>(&client_name), &client_name_len);
+        const int client = accept(server, reinterpret_cast<sockaddr *>(&client_name), &client_name_len);
         if (client == -1) {
             std::cerr << "There was error while accepting the connection\n";
             std::cout << strerror(errno) << std::endl;
             finalize();
             return -1;
         }
-        handleRequest();
-        close(client);
+
+
+        std::thread client_thread(&HttpServer::handleClient, this, client);
+        client_thread.detach();
     }
 }
 
-bool HttpServer::handleRequest() const {
-    HttpRequest request = readSocket();
+bool HttpServer::handleRequest(const int client) const {
+    HttpRequest request = readSocket(client);
     HttpResponse response;
     std::cout << "Got request for: " << request.path << " " << request.file << std::endl;
     if (request.method != MethodType::GET) {
-        handle501();
+        handle501(client);
         std::cout << "501 Method Not Implemented\n";
     } else if (request.file.empty() || request.file == "/") {
-        handle301(request);
+        handle301(request, client);
         std::cout << "301 Moved Permanently\n";
     } else if (request.file.find_last_of('.') > request.file.length()) {
-        handle403();
+        handle403(client);
         std::cout << "403 Forbidden\n";
     } else {
-        handle200(request);
+        handle200(request, client);
     }
 
     return request.keepAlive;
 }
 
-HttpRequest HttpServer::readSocket() const {
+HttpRequest HttpServer::readSocket(const int client) const {
     char buffer[BUFFER_SIZE];
 
     const ssize_t received = recv(client, buffer, BUFFER_SIZE, 0);
 
-    if (received < 0) {
-        std::cerr << "There was an error while receiving data\n";
-        std::terminate();
+    if (received <= 0) {
+        HttpRequest req{};
+        req.keepAlive = false; // Stop the loop
+        return req;
     }
 
     return processRequest(std::string(buffer));
@@ -165,48 +170,45 @@ void HttpServer::extractConnection(std::string line, HttpRequest &request) {
     }
 }
 
-void HttpServer::handle200(HttpRequest &request) const {
+void HttpServer::handle200(HttpRequest &request, const int client) const {
     if (request.path == "localhost") {
         request.path = "dom1.abc.pl";
     }
     const std::string filePath = this->path + "/" + request.path + "/" + request.file;
-    char buff[RESPONSE_BUFFER];
     std::string header;
     std::ifstream file;
     file.open(filePath);
+
     if (!file.is_open()) {
-        handle404();
+        handle404(client);
         std::cout << "404 Not Found\n";
     } else {
         file.close();
-        setHeader(request, header);
-        snprintf(buff, 18, "HTTP/1.1 200 OK\r\n");
-        send(client, buff, strlen(buff), 0);
-        snprintf(buff, header.length() + 1, "%s", header.c_str());
-        send(client, buff, strlen(buff), 0);
-        strcpy(buff, "\r\n");
-        send(client, buff, strlen(buff), 0);
-        if (request.content == "html" || request.content == "css") {
-            sendTextFile(filePath);
-        } else {
-            sendBinaryFile(filePath);
-        }
+        std::uintmax_t size = std::filesystem::file_size(filePath);
+        std::string headers = "HTTP/1.1 200 OK\r\n";
+
+        headers += "Content-Type: " + getContentType(request.file) + "\r\n";
+        headers += "Content-Length: " + std::to_string(size) + "\r\n";
+        headers += "Connection: keep-alive\r\n\r\n";
+
+        send(client, headers.c_str(), headers.length(), 0);
+        sendBinaryFile(filePath, client);
         std::cout << "200 OK\n";
     }
 }
 
-void HttpServer::handle301(const HttpRequest &request) const {
-    char buff[RESPONSE_BUFFER];
+void HttpServer::handle301(const HttpRequest &request, const int client) const {
+    char buff[RESPONSE_BUFFER] = {};
 
     snprintf(buff, 33, "HTTP/1.1 301 Moved Permanently\r\n");
     send(client, buff, strlen(buff), 0);
-    snprintf(buff, 33, "Location: http://%s:%d/index.html\r\n", request.path.c_str(), request.port);
+    snprintf(buff, 50, "Location: http://%s:%d/index.html\r\n", request.path.c_str(), request.port);
     send(client, buff, strlen(buff), 0);
     snprintf(buff, 3, "\r\n");
     send(client, buff, strlen(buff), 0);
 }
 
-void HttpServer::handle403() const {
+void HttpServer::handle403(const int client) const {
     char buff[RESPONSE_BUFFER];
 
     snprintf(buff, 25, "HTTP/1.1 403 Forbidden\r\n");
@@ -221,7 +223,7 @@ void HttpServer::handle403() const {
     send(client, buff, strlen(buff), 0);
 }
 
-void HttpServer::handle404() const {
+void HttpServer::handle404(const int client) const {
     char buff[RESPONSE_BUFFER];
 
     snprintf(buff, 25, "HTTP/1.1 404 Not Found\r\n");
@@ -236,7 +238,7 @@ void HttpServer::handle404() const {
     send(client, buff, strlen(buff), 0);
 }
 
-void HttpServer::handle501() const {
+void HttpServer::handle501(const int client) const {
     char buff[RESPONSE_BUFFER];
 
     snprintf(buff, 38, "HTTP/1.1 501 Method Not Implemented\r\n");
@@ -251,7 +253,7 @@ void HttpServer::handle501() const {
     send(client, buff, strlen(buff), 0);
 }
 
-void HttpServer::setHeader(HttpRequest &request, std::string &header) {
+void HttpServer::setHeader(HttpRequest &request, std::string &header, const std::string &filePath) {
     const unsigned long dot = request.file.find_last_of('.');
     const std::string extension = request.file.substr(dot + 1, request.file.length() - dot);
 
@@ -277,35 +279,17 @@ void HttpServer::setHeader(HttpRequest &request, std::string &header) {
         header = "Content-Type: application/octet-stream\r\n";
         request.content = "octet-stream";
     }
-}
 
-void HttpServer::keepAlive() const {
-    fd_set descriptors;
-    FD_ZERO(&descriptors);
-    FD_SET(server, &descriptors);
-    timeval tv{};
-    tv.tv_sec = TIMEOUT_SECONDS;
-    tv.tv_usec = 0;
-
-    const int ready = select(server + 1, &descriptors, nullptr, nullptr, &tv);
-    if (ready > 0) {
-        readSocket();
+    std::uintmax_t size = 0;
+    try {
+        size = std::filesystem::file_size(filePath);
+    } catch (...) {
+        size = 0;
     }
+    header += "Content-Length: " + std::to_string(size) + "\r\n";
 }
 
-void HttpServer::sendTextFile(const std::string &filePath) const {
-    std::string line;
-    std::ifstream file;
-    file.open(filePath);
-    if (file.is_open()) {
-        while (getline(file, line)) {
-            send(client, line.c_str(), line.length(), 0);
-        }
-        file.close();
-    }
-}
-
-void HttpServer::sendBinaryFile(const std::string &filePath) const {
+void HttpServer::sendBinaryFile(const std::string &filePath, const int client) const {
     std::ifstream file;
     char buff[RESPONSE_BUFFER];
     file.open(filePath, std::ios::binary | std::ios::in);
@@ -327,7 +311,45 @@ void HttpServer::sendBinaryFile(const std::string &filePath) const {
     file.close();
 }
 
+void HttpServer::handleClient(int client_fd) const {
+    timeval tv{};
+    tv.tv_sec = TIMEOUT_SECONDS;
+    tv.tv_usec = 0;
+    setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    while (true) {
+        const bool keep = handleRequest(client_fd);
+        if (!keep) {
+            break;
+        }
+    }
+
+    close(client_fd);
+    std::cout << "Connection closed for socket " << client_fd << std::endl;
+}
+
+std::string HttpServer::getContentType(const std::string &filename) {
+    const unsigned long dot = filename.find_last_of('.');
+    if (dot == std::string::npos) return "application/octet-stream";
+
+    const std::string ext = filename.substr(dot + 1);
+
+    if (ext == "html") { return "text/html"; }
+    if (ext == "css") { return "text/css"; }
+    if (ext == "js") { return "application/javascript"; }
+    if (ext == "jpg" || ext == "jpeg") { return "image/jpeg"; }
+    if (ext == "png") { return "image/png"; }
+    if (ext == "pdf") { return "application/pdf"; }
+
+    return "application/octet-stream";
+}
+
 void custom_trim(std::string &text) {
+    // trim leading
+    text.erase(text.begin(),
+               std::find_if(text.begin(), text.end(),
+                            [](const char ch) { return !std::isspace(static_cast<unsigned char>(ch)); }));
+    // trim trailing
     text.erase(std::find_if(text.rbegin(), text.rend(),
                             [](const char ch) { return !std::isspace(static_cast<unsigned char>(ch)); }).base(),
                text.end());

@@ -23,7 +23,7 @@
 #define BUFFER_SIZE 65535
 #define RESPONSE_BUFFER 1024
 #define CONNECTION_LIMIT 5
-#define TIMEOUT_SECONDS 1
+#define TIMEOUT_SECONDS 10
 
 enum class MethodType {
     GET, NOT_IMPLEMENTED
