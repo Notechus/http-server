@@ -23,7 +23,7 @@ public:
 
     HttpRequest readSocket() const;
 
-    static HttpRequest processRequest(std::string request);
+    static HttpRequest processRequest(const std::string &request);
 
     void handle200(HttpRequest &request) const;
 

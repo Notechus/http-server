@@ -44,11 +44,11 @@ int HttpServer::finalize() const {
 }
 
 int HttpServer::run() {
-    struct sockaddr_in client_name{};
+    sockaddr_in client_name{};
     socklen_t client_name_len = sizeof(client_name);
 
     while (true) {
-        client = accept(server, (struct sockaddr *) &client_name, &client_name_len);
+        client = accept(server, (sockaddr *) &client_name, &client_name_len);
         if (client == -1) {
             std::cerr << "There was error while accepting the connection\n";
             std::cout << strerror(errno) << std::endl;
@@ -70,7 +70,7 @@ bool HttpServer::handleRequest() const {
     } else if (request.file.empty() || request.file == "/") {
         handle301(request);
         std::cout << "301 Moved Permanently\n";
-    } else if (request.file.find_last_of(".") > request.file.length()) {
+    } else if (request.file.find_last_of('.') > request.file.length()) {
         handle403();
         std::cout << "403 Forbidden\n";
     } else {
@@ -93,7 +93,7 @@ HttpRequest HttpServer::readSocket() const {
     return processRequest(std::string(buffer));
 }
 
-HttpRequest HttpServer::processRequest(std::string request) {
+HttpRequest HttpServer::processRequest(const std::string &request) {
     HttpRequest req;
 
     std::istringstream stream(request);
@@ -117,8 +117,8 @@ HttpRequest HttpServer::processRequest(std::string request) {
 
 void HttpServer::extractMethod(std::string line, HttpRequest &request) {
     custom_trim(line);
-    unsigned long space = line.find_first_of(' ');
-    unsigned long http = line.find_last_of(' ');
+    const unsigned long space = line.find_first_of(' ');
+    const unsigned long http = line.find_last_of(' ');
 
     if (space > 0 && http > 0) {
         std::string method = line.substr(0, space);
@@ -135,18 +135,26 @@ void HttpServer::extractMethod(std::string line, HttpRequest &request) {
 }
 
 void HttpServer::extractHost(std::string line, HttpRequest &request) {
-    line = line.substr(6, line.length() - 6);
+    // remove Host: prefix
+    if (line.size() >= 6) {
+        line = line.substr(6);
+    }
+
     custom_trim(line);
-    unsigned long dot = line.find_last_of(":");
-    if (dot > 0) {
-        unsigned long found = line.find_first_of("http://");
-        if (found < 8) {
-            request.path = line.substr(7, dot - 7);
-        } else {
-            request.path = line.substr(0, dot);
-        }
+
+    // verify http(s) prefix and remove
+    if (line.compare(0, 7, "http://") == 0) {
+        line = line.substr(7);
+    } else if (line.compare(0, 8, "https://") == 0) {
+        line = line.substr(8);
+    }
+
+    const unsigned long portSeparator = line.find_last_of(':');
+    if (portSeparator != std::string::npos) {
+        request.path = line.substr(0, portSeparator);
+
         try {
-            std::string port = line.substr(dot + 1, line.length() - dot);
+            const std::string port = line.substr(portSeparator + 1, line.length() - portSeparator);
             request.port = std::stoi(port);
         } catch (...) {
         }
@@ -155,17 +163,19 @@ void HttpServer::extractHost(std::string line, HttpRequest &request) {
 
 void HttpServer::extractConnection(std::string line, HttpRequest &request) {
     custom_trim(line);
-    unsigned long dot = line.find_first_of(":");
-    if (dot > 0 && dot < line.length() - 1) {
-        std::string connection = line.substr(dot + 1, line.length());
+    const unsigned long headerSeparator = line.find_first_of(':');
+    if (headerSeparator > 0 && headerSeparator < line.length() - 1) {
+        std::string connection = line.substr(headerSeparator + 1, line.length());
         custom_trim(connection);
         request.keepAlive = connection == "keep-alive";
     }
 }
 
 void HttpServer::handle200(HttpRequest &request) const {
-    request.path = "dom1.abc.pl";
-    std::string filePath = this->path + "/" + request.path + "/" + request.file;
+    if (request.path == "localhost") {
+        request.path = "dom1.abc.pl";
+    }
+    const std::string filePath = this->path + "/" + request.path + "/" + request.file;
     char buff[RESPONSE_BUFFER];
     std::string header;
     std::ifstream file;
@@ -248,8 +258,8 @@ void HttpServer::handle501() const {
 }
 
 void HttpServer::setHeader(HttpRequest &request, std::string &header) {
-    unsigned long dot = request.file.find_last_of('.');
-    std::string extension = request.file.substr(dot + 1, request.file.length() - dot);
+    const unsigned long dot = request.file.find_last_of('.');
+    const std::string extension = request.file.substr(dot + 1, request.file.length() - dot);
 
     if (extension == "html") {
         header = "Content-Type: text/html\r\n";
@@ -283,7 +293,7 @@ void HttpServer::keepAlive() const {
     tv.tv_sec = TIMEOUT_SECONDS;
     tv.tv_usec = 0;
 
-    int ready = select(server + 1, &descriptors, nullptr, nullptr, &tv);
+    const int ready = select(server + 1, &descriptors, nullptr, nullptr, &tv);
     if (ready > 0) {
         readSocket();
     }
@@ -316,7 +326,7 @@ void HttpServer::sendBinaryFile(const std::string &filePath) const {
         } else {
             file.read(buff, size);
             send(client, buff, size, 0);
-            size -= size;
+            size = 0;
         }
     }
 
